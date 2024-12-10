@@ -1,4 +1,4 @@
-from tkinter import Canvas, Entry, Label, Tk
+from tkinter import Canvas, Entry, Label, Tk, Text, END
 import time
 from random_word_api import RandomWordAPI
 
@@ -14,19 +14,17 @@ class GameWindow:
         self.root.input_text = Entry(self.root, font="Roboto 16", fg="black", borderwidth=2, highlightbackground="black")
         self.root.input_text.pack(pady=20)
         self.root.input_text.bind('<Key>', self.start_timer)
-        self.root.input_text.bind('<KeyRelease>', self.spell_check)
-        self.root.canvas = Canvas(self.root, width=600, height=200, bg="white", borderwidth=2, highlightbackground="black")
-        self.root.canvas.pack(pady=20)
+        self.root.input_text.bind('<KeyRelease>', self.check_character_match)
+        self.root.input_text.bind('<space>', self.handle_space)
+        self.word_display = Text(self.root, font=("Roboto", 16), height=5, width=50, wrap='word', state='disabled')
+        self.word_display.pack(pady=20)
         self.word_api = RandomWordAPI()
         self.current_word_index = 0
         self.display_words()
-        self.highlight_current_word()
         self.root.label_time = Label(self.root, font="Roboto 20 bold", fg="black")
         self.root.label_time.pack(pady=20)
         self.root.mainloop()
 
-
-    
     def count_down(self):
         if not hasattr(self, 'counter'):
             self.counter = 60
@@ -47,69 +45,56 @@ class GameWindow:
             self.count_down()
 
     def display_words(self):
-        self.root.canvas.delete("all")
         self.words = self.word_api.get_random_words(10)
-        self.word_positions = []
-        
-        x_position = 20
-        y_position = 100
-        line_height = 30
-        current_line = 1
-        
-        for word in self.words:
-            word_width = len(word) * 10  
-            
-            if x_position + word_width > 580:
-                x_position = 10
-                y_position += line_height
-                current_line += 1
-            
-            text_id = self.root.canvas.create_text(
-                x_position,
-                y_position,
-                text=word,
-                font=("Roboto", 16),
-                fill="black",
-                anchor="w"  
-            )
-            self.word_positions.append(text_id)
-            x_position += word_width + 25
+        self.update_word_display()
 
+    def update_word_display(self):
+        self.word_display.config(state='normal')
+        self.word_display.delete(1.0, END)
+        self.word_display.insert(END, ' '.join(self.words))
+        self.word_display.config(state='disabled')
 
-    def spell_check(self, event):
-        if not hasattr(self, 'timer_started'):
-            return
-        
+    def check_character_match(self, event):
         current_word = self.words[self.current_word_index]
-        input_text = self.root.input_text.get()
+        input_text = self.root.input_text.get().strip()
 
-        if event.char == ' ':
-            self.root.input_text.delete(0, 'end')
-            if self.current_word_index < len(self.words) - 1:
-                self.current_word_index += 1
-                self.highlight_current_word()
-        else:
-            if len(input_text) <= len(current_word):
-                all_correct = True
-                for i in range(len(input_text)):
-                    if input_text[i] != current_word[i]:
-                        all_correct = False
-                        break
-                
-                self.root.canvas.itemconfig(
-                    self.word_positions[self.current_word_index],
-                    fill="green" if all_correct else "red"
-                )
-
-    def highlight_current_word(self):
-        for i, text_id in enumerate(self.word_positions):
-            self.root.canvas.itemconfig(i, fill="black")
+        self.word_display.config(state='normal')
+        self.word_display.delete(1.0, END)
         
-        if self.current_word_index < len(self.word_positions):
-            self.root.canvas.itemconfig(
-                self.word_positions[self.current_word_index], 
-                fill="blue"
-            )
+        for i, word in enumerate(self.words):
+            if i == self.current_word_index:
+                start_index = self.word_display.index(END)
+                for j, char in enumerate(word):
+                    if j < len(input_text):
+                        char_color = "green" if input_text[j] == char else "red"
+                        self.word_display.insert(END, char, char_color)
+                    else:
+                        self.word_display.insert(END, char)
+                end_index = self.word_display.index(END)
+                self.word_display.tag_add("current_word_bg", start_index, end_index)
+                self.word_display.insert(END, ' ')
+            else:
+                self.word_display.insert(END, word + ' ')
+        
+        self.word_display.tag_configure("green", foreground="green")
+        self.word_display.tag_configure("red", foreground="red")
+        self.word_display.tag_configure("current_word_bg", background="yellow")
+        self.word_display.config(state='disabled')
 
+        if event.keysym == 'BackSpace' and len(input_text) == 0 and self.current_word_index > 0:
+            self.current_word_index -= 1
+            self.root.input_text.delete(0, 'end')
+            self.root.input_text.insert(0, self.words[self.current_word_index])
 
+    def handle_space(self, event):
+        self.root.input_text.delete(0, 'end')
+        if self.current_word_index < len(self.words) - 1:
+            self.current_word_index += 1
+            self.root.input_text.delete(0, 'end')
 
+    def check_words_left(self):
+        if self.current_word_index >= len(self.words):
+            rand_words = self.word_api.get_random_words(10)
+            self.words.extend(rand_words)
+            self.update_word_display()
+            self.current_word_index = 0
