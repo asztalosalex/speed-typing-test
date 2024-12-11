@@ -1,4 +1,4 @@
-from tkinter import Canvas, Entry, Label, Tk, Text, END
+from tkinter import Canvas, Entry, Label, Tk, Text, END, Button
 import time
 from random_word_api import RandomWordAPI
 
@@ -23,6 +23,10 @@ class GameWindow:
         self.display_words()
         self.root.label_time = Label(self.root, font="Roboto 20 bold", fg="black")
         self.root.label_time.pack(pady=20)
+        self.root.button_restart = Button(self.root, text="Restart", font="Roboto 16", fg="black", borderwidth=2, highlightbackground="black", command=self.restart_game)
+        self.root.button_restart.place(x=350, y=500)
+        self.root.button_restart.config(width=10, height=2, disabledforeground="black", state="disabled")
+        self.root.button_restart.pack(pady=20)
         self.root.mainloop()
 
     def count_down(self):
@@ -38,6 +42,11 @@ class GameWindow:
             self.root.after_cancel(self.timer)
             self.root.label_time.config(text="Time's up!", fg="red")
             self.root.input_text.unbind('<Key>')
+            self.root.input_text.unbind('<KeyRelease>')
+            self.root.input_text.unbind('<space>')
+            self.root.input_text.unbind('<BackSpace>')
+            self.root.input_text.config(state='disabled')
+            self.root.button_restart.config(state="normal")
 
     def start_timer(self, event):
         if not hasattr(self, 'timer_started'):
@@ -98,3 +107,14 @@ class GameWindow:
             self.words.extend(rand_words)
             self.update_word_display()
             self.current_word_index = 0
+
+    def restart_game(self):
+        self.root.button_restart.config(state="disabled")
+        self.root.input_text.config(state='normal')
+        self.root.input_text.delete(0, 'end')
+        self.root.input_text.insert(0, self.words[self.current_word_index])
+        self.root.input_text.focus_set()
+        self.root.label_time.config(fg="black")
+        self.root.label_time.pack(pady=20)
+        self.root.display_words()
+        self.count_down()
